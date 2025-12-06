@@ -1,11 +1,12 @@
 import React from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Calendar, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Layout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
@@ -13,8 +14,8 @@ const Layout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
+    <div className="min-h-screen bg-gray-50 pb-24 md:pb-0">
+      <nav className="bg-white shadow-sm border-b hidden md:block">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -47,6 +48,38 @@ const Layout = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Outlet />
       </main>
+
+      {/* Mobile Bottom Nav */}
+      <div className="md:hidden fixed inset-x-0 bottom-0 bg-white border-t shadow-lg">
+        <div className="flex justify-around py-2">
+          <Link
+            to="/"
+            className={`flex flex-col items-center text-xs ${
+              location.pathname === '/' ? 'text-primary-600' : 'text-gray-500'
+            }`}
+          >
+            <Calendar className="h-6 w-6" />
+            <span>Meetings</span>
+          </Link>
+          <Link
+            to="/settings"
+            className={`flex flex-col items-center text-xs ${
+              location.pathname.includes('settings') ? 'text-primary-600' : 'text-gray-500'
+            }`}
+          >
+            <Settings className="h-6 w-6" />
+            <span>Settings</span>
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex flex-col items-center text-xs text-gray-500"
+          >
+            <LogOut className="h-6 w-6" />
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

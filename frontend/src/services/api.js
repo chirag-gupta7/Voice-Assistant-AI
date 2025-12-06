@@ -15,6 +15,7 @@ api.interceptors.request.use((config) => {
 export const authService = {
   login: (email, password) => api.post('/api/auth/login', { email, password }).then((res) => res.data),
   register: (name, email, password) => api.post('/api/auth/register', { name, email, password }).then((res) => res.data),
+  googleLogin: (token) => api.post('/api/auth/google', { token }).then((res) => res.data),
   getCurrentUser: () => api.get('/api/auth/me').then((res) => res.data)
 };
 

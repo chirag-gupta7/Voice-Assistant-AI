@@ -35,6 +35,13 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
+  const googleLogin = async (token) => {
+    const data = await authService.googleLogin(token);
+    localStorage.setItem('token', data.token);
+    setUser(data.user);
+    return data;
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
@@ -44,6 +51,7 @@ export const AuthProvider = ({ children }) => {
     user,
     login,
     register,
+    googleLogin,
     logout,
     isAuthenticated: Boolean(user),
     loading

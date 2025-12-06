@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import Enum, func
 
 from .extensions import bcrypt, db
 
@@ -22,6 +22,11 @@ class User(BaseModel, db.Model):
     name = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(255), nullable=False, unique=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
+    calendar_preference = db.Column(
+        Enum("local", "device", name="calendar_preference_enum"),
+        nullable=False,
+        default="local",
+    )
 
     meetings = db.relationship("Meeting", back_populates="owner", cascade="all, delete")
 
@@ -36,6 +41,7 @@ class User(BaseModel, db.Model):
             "id": self.id,
             "name": self.name,
             "email": self.email,
+            "calendar_preference": self.calendar_preference,
             "created_at": self.created_at.isoformat(),
         }
 
