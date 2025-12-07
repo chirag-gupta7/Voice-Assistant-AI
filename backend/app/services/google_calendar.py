@@ -1,0 +1,73 @@
+import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+logger = logging.getLogger(__name__)
+
+
+def _build_service(access_token: str):
+    """Create a Google Calendar service client using a raw access token."""
+    if not access_token:
+        return None
+
+    try:
+        creds = Credentials(token=access_token)
+        return build("calendar", "v3", credentials=creds, cache_discovery=False)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.warning("Failed to initialize Google Calendar service: %s", exc)
+        return None
+
+
+def list_upcoming_events(
+    access_token: str, max_results: int = 10, days_ahead: int = 7
+) -> List[Dict[str, Any]]:
+    """Return upcoming events from the primary calendar."""
+    service = _build_service(access_token)
+    if not service:
+        return []
+
+    time_min = datetime.now(timezone.utc).isoformat()
+    time_max = (datetime.now(timezone.utc) + timedelta(days=days_ahead)).isoformat()
+
+    try:
+        result = (
+            service.events()
+            .list(
+                calendarId="primary",
+                timeMin=time_min,
+                timeMax=time_max,
+                maxResults=max_results,
+                singleEvents=True,
+                orderBy="startTime",
+            )
+            .execute()
+        )
+        return result.get("items", [])
+    except HttpError as exc:
+        logger.warning("Google Calendar list failed: %s", exc)
+        return []
+
+
+def create_event(access_token: str, event_payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Create an event in the user's primary calendar."""
+    service = _build_service(access_token)
+    if not service:
+        return None
+
+    try:
+        created = (
+            service.events()
+            .insert(calendarId="primary", body=event_payload, sendUpdates="all")
+            .execute()
+        )
+        return created
+    except HttpError as exc:
+        logger.warning("Google Calendar insert failed: %s", exc)
+        return None
+
+
+__all__ = ["list_upcoming_events", "create_event"]

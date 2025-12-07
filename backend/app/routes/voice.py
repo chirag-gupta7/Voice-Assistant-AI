@@ -1,9 +1,8 @@
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import jwt_required
 
-from ..extensions import db
-from ..models import Meeting
-from ..services.voice import parse_voice_command
+from ..services.elevenlabs_service import synthesize_speech
+from ..services.llm_service import generate_action_reply
 
 voice_bp = Blueprint("voice", __name__)
 
@@ -13,29 +12,19 @@ voice_bp = Blueprint("voice", __name__)
 def process_voice():
     payload = request.get_json() or {}
     transcript = payload.get("transcript") or payload.get("text")
+    include_audio = bool(payload.get("include_audio", True))
 
     if not transcript:
         return jsonify({"success": False, "message": "Transcript is required"}), 400
 
-    command = parse_voice_command(transcript)
-    if not command:
-        return jsonify({"success": False, "message": "Unable to parse transcript"}), 400
-
-    meeting = Meeting(
-        title=command.title,
-        description=command.notes,
-        start_time=command.start_time,
-        duration_minutes=command.duration,
-        owner_id=get_jwt_identity(),
-    )
-
-    db.session.add(meeting)
-    db.session.commit()
+    action, reply = generate_action_reply(transcript)
+    audio_base64 = synthesize_speech(reply) if include_audio else None
 
     return jsonify(
         {
             "success": True,
-            "meeting": meeting.to_dict(),
-            "message": "Meeting scheduled",
+            "action": action,
+            "message": reply,
+            "audio_base64": audio_base64,
         }
     )
