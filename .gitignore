@@ -44,6 +44,16 @@ coverage/
 # Production
 /backend/instance/
 
+# Google OAuth credentials
+credentials.json
+token.json
+*-credentials.json
+*-token.json
+
+# API keys and sensitive config
+*.key
+*.pem
+
 # Misc
 *.orig
 .cache/
