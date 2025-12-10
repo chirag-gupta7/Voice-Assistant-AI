@@ -24,12 +24,13 @@ def _get_model():
 
     genai.configure(api_key=api_key)
 
-    # Prefer explicit model from env; otherwise fall back through a safe list.
+    # Prefer explicit model from env; otherwise fall back through a safe, stable list.
     configured_model = os.getenv("GEMINI_MODEL") or current_app.config.get("GEMINI_MODEL")
+    # Prioritize the stable/standard model; keep others as secondary options.
     fallback_models = [
-        "gemini-1.5-flash-8b",  # widely available
-        "gemini-1.5-flash",     # legacy name
-        "gemini-1.0-pro",       # older stable
+        "gemini-1.5-flash",  # current stable
+        "gemini-1.5-pro",
+        "gemini-1.0-pro",
     ]
 
     model_names = [configured_model] if configured_model else []
@@ -68,7 +69,7 @@ def generate_action_reply(user_text: str) -> Tuple[str, str]:
 
     except Exception as exc:  # pylint: disable=broad-except
         logger.warning("Gemini generation failed: %s", exc)
-        return "general_response", "I could not process that request."
+        return "general_response", "I encountered an error processing that request."
 
     # Parse JSON
     action = "general_response"
