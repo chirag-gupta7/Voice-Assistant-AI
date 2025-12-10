@@ -1,75 +1,65 @@
 import json
 import logging
-from typing import Tuple
 import os
+from typing import Tuple
 
 from flask import current_app
-import google.generativeai as genai
+from huggingface_hub import InferenceClient
 
 logger = logging.getLogger(__name__)
 
+# We use a model known for good JSON adherence and instruction following
+# You can also use "meta-llama/Meta-Llama-3-8B-Instruct" if you have access
+HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"
+
 SYSTEM_PROMPT = (
     "You are a helpful voice meeting assistant."
-    " Respond ONLY in raw JSON format (no markdown formatting) with keys 'action' and 'reply'."
-    " action should be one of ['schedule_meeting', 'fetch_calendar', 'general_response']."
-    " reply should be concise and user-friendly."
+    " You must respond ONLY in valid JSON format. Do not use Markdown code blocks."
+    " Return a JSON object with exactly two keys: 'action' and 'reply'."
+    " Valid 'action' values: ['schedule_meeting', 'fetch_calendar', 'general_response']."
+    " 'reply': A concise, friendly response to speak back to the user."
 )
 
 
-def _get_model():
-    api_key = current_app.config.get("GEMINI_API_KEY")
+def _get_client():
+    api_key = current_app.config.get("HUGGINGFACE_API_KEY")
     if not api_key:
-        logger.info("GEMINI_API_KEY not configured; skipping LLM call")
+        logger.info("HUGGINGFACE_API_KEY not configured; skipping LLM call")
         return None
-
-    genai.configure(api_key=api_key)
-
-    # Prefer explicit model from env; otherwise fall back through a safe, stable list.
-    configured_model = os.getenv("GEMINI_MODEL") or current_app.config.get("GEMINI_MODEL")
-    # Prioritize the stable/standard model; keep others as secondary options.
-    fallback_models = [
-        "gemini-1.5-flash",  # current stable
-        "gemini-1.5-pro",
-        "gemini-1.0-pro",
-    ]
-
-    model_names = [configured_model] if configured_model else []
-    model_names.extend([m for m in fallback_models if m not in model_names])
-
-    last_error = None
-    for name in model_names:
-        try:
-            return genai.GenerativeModel(name, system_instruction=SYSTEM_PROMPT)
-        except Exception as exc:  # pragma: no cover
-            last_error = exc
-            logger.warning("Failed to init Gemini model '%s': %s", name, exc)
-
-    # If everything fails, surface a clear log but keep app alive.
-    if last_error:
-        logger.error("All Gemini model attempts failed: %s", last_error)
-    return None
+    return InferenceClient(token=api_key)
 
 
 def generate_action_reply(user_text: str) -> Tuple[str, str]:
-    model = _get_model()
-    if not model:
+    client = _get_client()
+    if not client:
         return "general_response", "AI is not configured."
 
+    # Construct messages for Chat API
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_text},
+    ]
+
     try:
-        # Generate content
-        response = model.generate_content(
-            user_text,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.3,
-                response_mime_type="application/json",  # Enforces JSON output
-            ),
+        response = client.chat_completion(
+            model=HF_MODEL,
+            messages=messages,
+            max_tokens=150,
+            temperature=0.3,
         )
 
-        content = response.text
+        # Extract the content from the response object
+        content = response.choices[0].message.content
 
-    except Exception as exc:  # pylint: disable=broad-except
-        logger.warning("Gemini generation failed: %s", exc)
-        return "general_response", "I encountered an error processing that request."
+        # Clean up potential markdown formatting (```json ... ```)
+        if "```" in content:
+            content = content.replace("```json", "").replace("```", "")
+
+        content = content.strip()
+
+    except Exception as exc:
+        logger.warning("Hugging Face generation failed: %s", exc)
+        return "general_response", "I'm having trouble connecting to the brain."
 
     # Parse JSON
     action = "general_response"
@@ -81,7 +71,7 @@ def generate_action_reply(user_text: str) -> Tuple[str, str]:
             action = data.get("action") or action
             reply = data.get("reply") or reply
     except json.JSONDecodeError:
-        # Fallback if JSON fails, though response_mime_type usually prevents this
-        reply = content.strip()
+        logger.warning("Failed to parse JSON from HF: %s", content)
+        reply = content  # Fallback: just speak the raw text
 
     return action, reply
