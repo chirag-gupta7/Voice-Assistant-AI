@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import Enum, func
+from sqlalchemy import Enum, func, JSON
 
 from .extensions import bcrypt, db
 
@@ -29,6 +29,8 @@ class User(BaseModel, db.Model):
     )
 
     meetings = db.relationship("Meeting", back_populates="owner", cascade="all, delete")
+    notes = db.relationship("Note", back_populates="owner", cascade="all, delete")
+    logs = db.relationship("Log", back_populates="user", cascade="all, delete")
 
     def set_password(self, password: str) -> None:
         self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
@@ -69,3 +71,41 @@ class Meeting(BaseModel, db.Model):
     @property
     def end_time(self) -> datetime:
         return self.start_time + timedelta(minutes=self.duration_minutes)
+
+
+class Note(BaseModel, db.Model):
+    __tablename__ = "notes"
+
+    content = db.Column(db.Text, nullable=False)
+    user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False)
+    owner = db.relationship("User", back_populates="notes")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "content": self.content,
+            "user_id": self.user_id,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
+class Log(BaseModel, db.Model):
+    __tablename__ = "logs"
+
+    level = db.Column(db.String(50), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    source = db.Column(db.String(120), nullable=True)
+    extra_data = db.Column(JSON, nullable=True)
+    user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True)
+    user = db.relationship("User", back_populates="logs")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "level": self.level,
+            "message": self.message,
+            "source": self.source,
+            "extra_data": self.extra_data or {},
+            "user_id": self.user_id,
+            "created_at": self.created_at.isoformat(),
+        }
