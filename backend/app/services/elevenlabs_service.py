@@ -40,6 +40,7 @@ def synthesize_speech(text: str) -> Optional[str]:
         audio_bytes = b"".join(audio_stream)
         return base64.b64encode(audio_bytes).decode("utf-8")
     except Exception as exc:  # pylint: disable=broad-except
+        # Return None so callers can still show text; log for visibility.
         logger.warning("ElevenLabs synthesis failed: %s", exc)
         return None
 

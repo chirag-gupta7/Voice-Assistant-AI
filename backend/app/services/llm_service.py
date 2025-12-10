@@ -1,11 +1,10 @@
 import json
 import logging
-from typing import Optional, Tuple
+from typing import Tuple
 import os
 
 from flask import current_app
 import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +24,29 @@ def _get_model():
 
     genai.configure(api_key=api_key)
 
-    # Using Gemini 1.5 Flash for speed and low latency (ideal for voice)
-    model = genai.GenerativeModel(
-        "gemini-1.5-flash",
-        system_instruction=SYSTEM_PROMPT,
-    )
-    return model
+    # Prefer explicit model from env; otherwise fall back through a safe list.
+    configured_model = os.getenv("GEMINI_MODEL") or current_app.config.get("GEMINI_MODEL")
+    fallback_models = [
+        "gemini-1.5-flash-8b",  # widely available
+        "gemini-1.5-flash",     # legacy name
+        "gemini-1.0-pro",       # older stable
+    ]
+
+    model_names = [configured_model] if configured_model else []
+    model_names.extend([m for m in fallback_models if m not in model_names])
+
+    last_error = None
+    for name in model_names:
+        try:
+            return genai.GenerativeModel(name, system_instruction=SYSTEM_PROMPT)
+        except Exception as exc:  # pragma: no cover
+            last_error = exc
+            logger.warning("Failed to init Gemini model '%s': %s", name, exc)
+
+    # If everything fails, surface a clear log but keep app alive.
+    if last_error:
+        logger.error("All Gemini model attempts failed: %s", last_error)
+    return None
 
 
 def generate_action_reply(user_text: str) -> Tuple[str, str]:

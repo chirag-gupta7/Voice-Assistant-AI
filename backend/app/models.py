@@ -55,6 +55,7 @@ class Meeting(BaseModel, db.Model):
     description = db.Column(db.Text)
     start_time = db.Column(db.DateTime, nullable=False)
     duration_minutes = db.Column(db.Integer, nullable=False, default=30)
+    extra_data = db.Column(JSON, nullable=True)
 
     owner_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False)
     owner = db.relationship("User", back_populates="meetings")
@@ -66,6 +67,7 @@ class Meeting(BaseModel, db.Model):
             "description": self.description,
             "start_time": self.start_time.isoformat(),
             "duration": self.duration_minutes,
+            "extra_data": self.extra_data or {},
         }
 
     @property

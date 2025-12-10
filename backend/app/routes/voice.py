@@ -33,7 +33,13 @@ def process_voice():
     if command_result:
         reply = command_result.get("user_message", reply)
 
-    audio_base64 = synthesize_speech(reply) if include_audio else None
+    audio_base64 = None
+    audio_error = None
+
+    if include_audio:
+        audio_base64 = synthesize_speech(reply)
+        if audio_base64 is None:
+            audio_error = "tts_unavailable"
 
     return jsonify(
         {
@@ -42,5 +48,6 @@ def process_voice():
             "message": reply,
             "command_result": command_result,
             "audio_base64": audio_base64,
+            "audio_error": audio_error,
         }
     )
