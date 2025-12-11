@@ -8,6 +8,25 @@ from ..services.command_processor import VoiceCommandProcessor
 voice_bp = Blueprint("voice", __name__)
 
 
+@voice_bp.get("/greeting")
+@jwt_required()
+def get_greeting():
+    """Returns the audio for the initial greeting."""
+    greeting_text = "Hello! I can help you schedule meetings or check your calendar. What would you like to do?"
+    
+    # Generate audio
+    audio_base64 = synthesize_speech(greeting_text)
+    
+    if audio_base64 is None:
+        return jsonify({"success": False, "message": "TTS unavailable"}), 500
+
+    return jsonify({
+        "success": True, 
+        "message": greeting_text,
+        "audio_base64": audio_base64
+    })
+
+
 @voice_bp.post("/process")
 @jwt_required()
 def process_voice():

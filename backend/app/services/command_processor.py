@@ -695,23 +695,24 @@ class VoiceCommandProcessor:
             if result and result.get('success'):
                 event = result.get('event', {})
                 
-                # Use the message provided by the calendar service if available
+                # Build the base message
                 if 'message' in result:
-                    user_message = result.get('message')
+                    base_message = result.get('message')
                 else:
                     # Otherwise, construct the message based on event details
                     if event.get('is_all_day', False):
-                        user_message = f"I've scheduled an all-day event '{event.get('summary')}' on {event.get('date', 'the requested date')}"
+                        base_message = f"I've scheduled an all-day event '{event.get('summary')}' on {event.get('date', 'the requested date')}."
                     else:
-                        user_message = f"I've scheduled '{event.get('summary')}' on {event.get('date', 'the requested date')} from {event.get('start_time', 'specified time')}"
-                        if 'end_time' in event:
-                            user_message += f" to {event.get('end_time')}"
+                        base_message = f"I've scheduled '{event.get('summary')}' on {event.get('date', 'the requested date')} at {event.get('start_time', 'specified time')}."
+                
+                # APPEND THE FOLLOW-UP QUESTION
+                user_message = f"{base_message} Is there anything else I can help you with?"
                 
                 return {
                     'success': True,
                     'data': event,
                     'user_message': user_message,
-                    'htmlLink': event.get('htmlLink', '') # Adding direct link to the calendar event
+                    'htmlLink': event.get('htmlLink', '')
                 }
             else:
                 error_msg = result.get('error', 'Could not parse event details from your request.')

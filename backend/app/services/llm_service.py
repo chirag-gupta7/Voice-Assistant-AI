@@ -8,16 +8,19 @@ from huggingface_hub import InferenceClient
 
 logger = logging.getLogger(__name__)
 
-# We use a model known for good JSON adherence and instruction following
-# You can also use "meta-llama/Meta-Llama-3-8B-Instruct" if you have access
-HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"
+HF_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
 
+# Updated Prompt for better intent recognition
 SYSTEM_PROMPT = (
-    "You are a helpful voice meeting assistant."
-    " You must respond ONLY in valid JSON format. Do not use Markdown code blocks."
-    " Return a JSON object with exactly two keys: 'action' and 'reply'."
-    " Valid 'action' values: ['schedule_meeting', 'fetch_calendar', 'general_response']."
-    " 'reply': A concise, friendly response to speak back to the user."
+    "You are a smart voice assistant. "
+    "Your goal is to classify user intent into JSON actions."
+    " Respond ONLY in valid JSON format with keys: 'action' and 'reply'.\n\n"
+    "RULES:\n"
+    "1. If the user mentions 'meet', 'book', 'schedule', 'appointment', or 'calendar', classify as 'schedule_meeting'.\n"
+    "2. If the user asks for weather, classify as 'weather'.\n"
+    "3. Otherwise, use 'general_response'.\n"
+    "4. 'reply' should be a short, friendly response spoken to the user.\n\n"
+    "Valid 'action' values: ['schedule_meeting', 'weather', 'general_response']"
 )
 
 
