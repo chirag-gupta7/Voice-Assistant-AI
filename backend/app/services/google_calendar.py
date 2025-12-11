@@ -1,10 +1,12 @@
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from google_auth_oauthlib.flow import InstalledAppFlow
 
 logger = logging.getLogger(__name__)
 
@@ -70,4 +72,16 @@ def create_event(access_token: str, event_payload: Dict[str, Any]) -> Optional[D
         return None
 
 
-__all__ = ["list_upcoming_events", "create_event"]
+__all__ = ["list_upcoming_events", "create_event", "get_auth_url"]
+
+
+def get_auth_url() -> str:
+    """Generate a Google OAuth URL for the frontend to open."""
+    creds_file = os.path.join(os.getcwd(), "credentials.json")
+    flow = InstalledAppFlow.from_client_secrets_file(
+        creds_file,
+        scopes=["https://www.googleapis.com/auth/calendar.events"],
+    )
+    flow.redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:3000/oauth2callback")
+    auth_url, _ = flow.authorization_url(prompt="consent")
+    return auth_url

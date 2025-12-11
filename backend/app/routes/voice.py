@@ -4,7 +4,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from ..services.elevenlabs_service import synthesize_speech
 from ..services.llm_service import generate_action_reply
 from ..services.command_processor import VoiceCommandProcessor
-from ..services.google_calendar_integration import get_auth_url
+from ..services.google_calendar import get_auth_url
 
 voice_bp = Blueprint("voice", __name__)
 
@@ -43,19 +43,20 @@ def process_voice():
 
     action, reply = generate_action_reply(transcript)
     command_result = None
+    auth_url = None
+    action_type = action
 
     # Delegate to richer processor when intent is clear
     if action == "schedule_meeting":
-        auth_check = get_auth_url()
-        if auth_check.get("status") == "needs_auth":
-            return jsonify({
-                "success": True,
-                "action": "auth_required",
-                "message": "I need permission to access your calendar. Please authorize to continue.",
-                "auth_url": auth_check.get("auth_url"),
-            })
-
         command_result = processor.create_calendar_event(transcript)
+
+        # If scheduling failed due to missing creds/connection, surface auth URL
+        if command_result and not command_result.get("success"):
+            err = (command_result.get("error") or "").lower()
+            if "connect" in err or "cred" in err:
+                auth_url = get_auth_url()
+                reply = "I need permission to access your Google Calendar. Please click the button below to connect."
+                action_type = "auth_required"
     elif "weather" in transcript.lower():
         command_result = processor.get_weather(location="current location")
 
@@ -73,10 +74,11 @@ def process_voice():
     return jsonify(
         {
             "success": True,
-            "action": action,
+            "action": action_type,
             "message": reply,
             "command_result": command_result,
             "audio_base64": audio_base64,
             "audio_error": audio_error,
+            "auth_url": auth_url,
         }
     )
