@@ -8,6 +8,7 @@ import Register from './pages/Register';
 import Settings from './pages/Settings';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import OAuthCallback from './components/OAuthCallback';
 
 function App() {
   const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
@@ -18,6 +19,15 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+
+            <Route
+              path="/oauth2callback"
+              element={(
+                <ProtectedRoute>
+                  <OAuthCallback />
+                </ProtectedRoute>
+              )}
+            />
 
             <Route
               path="/"

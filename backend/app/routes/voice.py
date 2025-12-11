@@ -1,5 +1,7 @@
+import os
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from google_auth_oauthlib.flow import InstalledAppFlow
 
 from ..services.elevenlabs_service import synthesize_speech
 from ..services.llm_service import generate_action_reply
@@ -82,3 +84,42 @@ def process_voice():
             "auth_url": auth_url,
         }
     )
+
+
+@voice_bp.post("/google_callback")
+@jwt_required()
+def google_callback():
+    payload = request.get_json() or {}
+    code = payload.get("code")
+
+    if not code:
+        return jsonify({"success": False, "message": "No code provided"}), 400
+
+    try:
+        creds_file = os.path.join(os.getcwd(), "credentials.json")
+        flow = InstalledAppFlow.from_client_secrets_file(
+            creds_file,
+            scopes=["https://www.googleapis.com/auth/calendar.events"],
+            redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:3000/oauth2callback"),
+        )
+
+        flow.fetch_token(code=code)
+        creds = flow.credentials
+
+        # Persist tokens for reuse
+        token_path = os.path.join(os.getcwd(), "token.pickle")
+        token_json_path = os.path.join(os.getcwd(), "token.json")
+        try:
+            with open(token_path, "wb") as token_file:
+                import pickle
+
+                pickle.dump(creds, token_file)
+            with open(token_json_path, "w") as token_json_file:
+                token_json_file.write(creds.to_json())
+        except Exception:
+            pass
+
+        return jsonify({"success": True, "message": "Calendar connected"})
+
+    except Exception as exc:  # pragma: no cover
+        return jsonify({"success": False, "message": str(exc)}), 500
