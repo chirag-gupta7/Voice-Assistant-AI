@@ -1,22 +1,33 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Calendar } from 'lucide-react';
+import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
-import { GoogleLogin } from '@react-oauth/google';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, googleLogin } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleGoogleSuccess = async (credentialResponse) => {
+  const handleGoogleSuccess = async (authResult) => {
     try {
       setLoading(true);
-      await googleLogin(credentialResponse.credential);
-      navigate('/');
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: authResult.code }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        navigate('/');
+      } else {
+        setError(data.message || 'Google login failed');
+      }
     } catch (err) {
       setError('Google login failed');
     } finally {
@@ -38,6 +49,13 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  const googleLogin = useGoogleLogin({
+    onSuccess: handleGoogleSuccess,
+    onError: () => setError('Google login failed'),
+    flow: 'auth-code',
+    scope: 'openid email profile https://www.googleapis.com/auth/calendar.events',
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
@@ -97,10 +115,14 @@ const Login = () => {
               </div>
             </div>
 
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={() => setError('Google Login Failed')}
-            />
+            <button
+              type="button"
+              onClick={() => googleLogin()}
+              className="w-full bg-red-500 text-white p-2 rounded hover:bg-red-600 transition"
+              disabled={loading}
+            >
+              {loading ? 'Connecting…' : 'Sign in with Google (Calendar)'}
+            </button>
           </div>
         </form>
 

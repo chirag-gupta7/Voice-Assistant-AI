@@ -27,6 +27,7 @@ class User(BaseModel, db.Model):
         nullable=False,
         default="local",
     )
+    google_credentials = db.Column(JSON, nullable=True)
 
     meetings = db.relationship("Meeting", back_populates="owner", cascade="all, delete")
     notes = db.relationship("Note", back_populates="owner", cascade="all, delete")

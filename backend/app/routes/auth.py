@@ -1,7 +1,8 @@
+import json
+import os
 from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
+from google_auth_oauthlib.flow import InstalledAppFlow
 
 from ..extensions import db
 from ..models import User
@@ -65,34 +66,56 @@ def current_user():
 @auth_bp.post("/google")
 def google_login():
     payload = request.get_json() or {}
-    token = payload.get("token")
+    code = payload.get("code")
 
-    if not token:
-        return jsonify({"message": "Token is required"}), 400
+    if not code:
+        return jsonify({"message": "Authorization code is required"}), 400
 
     try:
-        client_id = current_app.config.get("GOOGLE_CLIENT_ID")
-        id_info = id_token.verify_oauth2_token(token, google_requests.Request(), client_id)
+        creds_file = os.path.join(os.getcwd(), "credentials.json")
 
-        email = id_info.get("email")
-        name = id_info.get("name") or email.split("@")[0]
+        flow = InstalledAppFlow.from_client_secrets_file(
+            creds_file,
+            scopes=[
+                "openid",
+                "https://www.googleapis.com/auth/userinfo.email",
+                "https://www.googleapis.com/auth/userinfo.profile",
+                "https://www.googleapis.com/auth/calendar.events",
+            ],
+            redirect_uri=current_app.config.get("GOOGLE_REDIRECT_URI", "http://localhost:3000"),
+        )
+
+        flow.fetch_token(code=code)
+        creds = flow.credentials
+
+        session = flow.authorized_session()
+        user_info = session.get("https://www.googleapis.com/userinfo/v2/me").json()
+        email = user_info.get("email")
+        name = user_info.get("name") or (email.split("@")[0] if email else None)
 
         if not email:
-            return jsonify({"message": "Invalid Google token"}), 401
+            return jsonify({"message": "Could not retrieve email from Google"}), 400
 
         user = User.query.filter_by(email=email).first()
         if not user:
             import secrets
 
-            user = User(name=name, email=email)
+            user = User(name=name or email, email=email)
             user.set_password(secrets.token_hex(16))
             db.session.add(user)
-            db.session.commit()
+
+        user.google_credentials = json.loads(creds.to_json())
+        db.session.commit()
 
         access_token = create_access_token(identity=user.id)
-        return jsonify({"token": access_token, "user": user.to_dict()})
-    except ValueError:
-        return jsonify({"message": "Invalid Google token"}), 401
+        return jsonify(
+            {
+                "token": access_token,
+                "user": user.to_dict(),
+                "calendar_connected": True,
+            }
+        )
+
     except Exception as exc:  # pragma: no cover
         return jsonify({"message": str(exc)}), 500
 

@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -7,6 +8,10 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+
+from ..extensions import db
+from ..models import User
 
 logger = logging.getLogger(__name__)
 
@@ -85,3 +90,22 @@ def get_auth_url() -> str:
     flow.redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:3000/oauth2callback")
     auth_url, _ = flow.authorization_url(prompt="consent")
     return auth_url
+
+
+def get_service_for_user(user_id: str):
+    """Return a calendar service using stored user credentials, or None if not connected."""
+    user = User.query.get(user_id)
+    if not user or not user.google_credentials:
+        return None
+
+    try:
+        creds = Credentials.from_authorized_user_info(user.google_credentials)
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            user.google_credentials = json.loads(creds.to_json())
+            db.session.commit()
+
+        return build("calendar", "v3", credentials=creds, cache_discovery=False)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Failed to load calendar creds for user %s: %s", user_id, exc)
+        return None
