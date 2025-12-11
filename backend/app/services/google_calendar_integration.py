@@ -16,7 +16,10 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 TOKEN_PATH = os.path.join(BASE_DIR, "token.pickle")
 CREDENTIALS_PATH = os.path.join(BASE_DIR, "credentials.json")
 _cached_calendar_service = None
-def authenticate_google_calendar():
+
+
+def _load_creds() -> Credentials:
+    """Load and refresh credentials if possible; returns None when user action is required."""
     creds = None
     if os.path.exists(TOKEN_PATH):
         try:
@@ -25,25 +28,46 @@ def authenticate_google_calendar():
         except Exception as exc:  # pragma: no cover
             logger.error("Failed to load token.pickle: %s", exc)
             creds = None
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-            except Exception as exc:  # pragma: no cover
-                logger.error("Failed to refresh Google creds: %s", exc)
-                creds = None
-                if os.path.exists(TOKEN_PATH):
-                    os.remove(TOKEN_PATH)
-        if not creds:
-            if not os.path.exists(CREDENTIALS_PATH):
-                raise FileNotFoundError("credentials.json not found in backend directory")
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
-            creds = flow.run_local_server(port=0)
+
+    # Refresh if expired and refresh token exists
+    if creds and creds.expired and creds.refresh_token:
         try:
+            creds.refresh(Request())
             with open(TOKEN_PATH, "wb") as token:
                 pickle.dump(creds, token)
         except Exception as exc:  # pragma: no cover
-            logger.error("Failed to write token.pickle: %s", exc)
+            logger.error("Failed to refresh Google creds: %s", exc)
+            creds = None
+            if os.path.exists(TOKEN_PATH):
+                os.remove(TOKEN_PATH)
+
+    return creds if creds and creds.valid else None
+
+
+def get_auth_url(redirect_uri: str = None) -> Dict[str, Any]:
+    """Generate an OAuth URL for the frontend to open when auth is required."""
+    creds = _load_creds()
+    if creds:
+        return {"status": "authenticated", "creds": creds}
+
+    if not os.path.exists(CREDENTIALS_PATH):
+        raise FileNotFoundError("credentials.json not found in backend directory")
+
+    flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
+    flow.redirect_uri = redirect_uri or os.environ.get(
+        "GOOGLE_REDIRECT_URI", "http://localhost:3000/oauth2callback"
+    )
+
+    auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
+    return {"status": "needs_auth", "auth_url": auth_url}
+
+
+def authenticate_google_calendar():
+    """Return a calendar service if creds are already available; skip browser flows."""
+    creds = _load_creds()
+    if not creds:
+        return None
+
     return build("calendar", "v3", credentials=creds, cache_discovery=False)
 def get_calendar_service():
     global _cached_calendar_service
@@ -83,6 +107,8 @@ def _normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
 def get_today_schedule() -> str:
     try:
         service = get_calendar_service()
+        if service is None:
+            return "Google Calendar authorization required"
         now = datetime.utcnow()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)
@@ -116,6 +142,8 @@ def get_today_schedule() -> str:
 def get_upcoming_events(days_ahead: int = 7) -> Dict[str, Any]:
     try:
         service = get_calendar_service()
+        if service is None:
+            return {"success": False, "error": "Google Calendar authorization required", "events": []}
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
         end_time = now + timedelta(days=days_ahead)
         events_result = (
@@ -137,6 +165,8 @@ def get_upcoming_events(days_ahead: int = 7) -> Dict[str, Any]:
 def get_next_meeting() -> Dict[str, Any]:
     try:
         service = get_calendar_service()
+        if service is None:
+            return {"success": False, "error": "Google Calendar authorization required", "event": {}}
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
         events_result = (
             service.events()
@@ -164,6 +194,8 @@ def get_next_meeting() -> Dict[str, Any]:
 def get_free_time_today() -> Dict[str, Any]:
     try:
         service = get_calendar_service()
+        if service is None:
+            return {"success": False, "error": "Google Calendar authorization required", "free_slots": []}
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
         start_of_day = now.replace(hour=9, minute=0, second=0, microsecond=0)
         end_of_day = now.replace(hour=17, minute=0, second=0, microsecond=0)
@@ -211,6 +243,8 @@ def get_free_time_today() -> Dict[str, Any]:
 def create_event_from_conversation(conversation_text: str) -> Dict[str, Any]:
     try:
         service = get_calendar_service()
+        if service is None:
+            return {"success": False, "error": "Google Calendar authorization required", "message": "Please authorize calendar access"}
         text = (conversation_text or "").strip()
         event = None
         try:
@@ -252,4 +286,5 @@ __all__ = [
     "create_event_manual_parse",
     "test_calendar_connection",
     "get_calendar_service",
+    "get_auth_url",
 ]

@@ -7,6 +7,8 @@ const Dashboard = () => {
   const [meetings, setMeetings] = useState([]);
   const [processing, setProcessing] = useState(false);
   const [showVoiceInput, setShowVoiceInput] = useState(false);
+  const [responseMessage, setResponseMessage] = useState('');
+  const [authUrl, setAuthUrl] = useState(null);
 
   useEffect(() => {
     loadMeetings();
@@ -25,7 +27,16 @@ const Dashboard = () => {
     try {
       setProcessing(true);
       const result = await meetingService.processVoiceCommand(transcript);
-      if (result.success) {
+      setResponseMessage(result?.message || '');
+
+      if (result?.action === 'auth_required' && result?.auth_url) {
+        setAuthUrl(result.auth_url);
+        return;
+      }
+
+      setAuthUrl(null);
+
+      if (result?.success) {
         await loadMeetings();
         setShowVoiceInput(false);
       }
@@ -53,7 +64,12 @@ const Dashboard = () => {
       {showVoiceInput && (
         <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-200">
           <h2 className="text-xl font-semibold mb-4 text-center">Schedule with Voice</h2>
-          <VoiceInput onTranscript={handleVoiceTranscript} onProcessing={setProcessing} />
+          <VoiceInput
+            onTranscript={handleVoiceTranscript}
+            onProcessing={setProcessing}
+            responseMessage={responseMessage}
+            authUrl={authUrl}
+          />
           {processing && (
             <p className="text-center text-sm text-gray-500 mt-4">Processing your request…</p>
           )}

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Mic, MicOff, Square } from 'lucide-react';
 import { voiceService } from '../services/voiceService';
 
-const VoiceInput = ({ onTranscript, onProcessing }) => {
+const VoiceInput = ({ onTranscript, onProcessing, responseMessage, authUrl }) => {
   const [isListening, setIsListening] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -175,6 +175,24 @@ const VoiceInput = ({ onTranscript, onProcessing }) => {
         <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
           <p className="text-sm text-gray-500 mb-1">You said:</p>
           <p className="text-gray-900">{transcript}</p>
+        </div>
+      )}
+
+      {(responseMessage || authUrl) && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+          {responseMessage && (
+            <p className="text-sm text-blue-800">{responseMessage}</p>
+          )}
+          {authUrl && (
+            <a
+              href={authUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+            >
+              Authorize Google Calendar
+            </a>
+          )}
         </div>
       )}
 
