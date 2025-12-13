@@ -13,10 +13,11 @@ def create_app(config_class: type[Config] | None = None) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_class or Config())
 
-    # Allow frontend dev server
+    # Explicitly allow requests from frontend URL (localhost:5173)
+    # and allow credentials (cookies) to be passed back and forth.
     CORS(
         app,
-        origins=app.config.get("CORS_ORIGINS"),
+        resources={r"/api/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}},
         supports_credentials=True,
     )
 

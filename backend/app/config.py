@@ -13,5 +13,5 @@ class Config:
     HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
     ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
     ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "pNInz6obpgDQGcFmaJgB")
-    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
     CORS_ORIGINS = [FRONTEND_URL]
