@@ -97,10 +97,20 @@ def google_callback():
 
     try:
         creds_file = os.path.join(os.getcwd(), "credentials.json")
+        
+        # Force localhost (not 127.0.0.1) for consistency with Google Console
+        redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:5173/oauth/callback")
+        
+        if '127.0.0.1' in redirect_uri:
+            redirect_uri = redirect_uri.replace('127.0.0.1', 'localhost')
+        
+        # Debug logging to track what URI is being used
+        print(f"DEBUG: Calendar callback using redirect_uri: {redirect_uri}")
+        
         flow = InstalledAppFlow.from_client_secrets_file(
             creds_file,
             scopes=["https://www.googleapis.com/auth/calendar.events"],
-            redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:3000/oauth2callback"),
+            redirect_uri=redirect_uri,
         )
 
         flow.fetch_token(code=code)

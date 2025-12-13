@@ -74,6 +74,13 @@ def google_login():
     try:
         creds_file = os.path.join(os.getcwd(), "credentials.json")
 
+        # FRONTEND_REDIRECT_URI must match EXACTLY the route in React App
+        # This matches the redirect_uris in credentials.json
+        FRONTEND_REDIRECT_URI = 'http://localhost:5173/auth/callback'
+        
+        # Debug logging to track what URI is being used
+        print(f"DEBUG: Google login using redirect_uri: {FRONTEND_REDIRECT_URI}")
+
         flow = InstalledAppFlow.from_client_secrets_file(
             creds_file,
             scopes=[
@@ -82,7 +89,7 @@ def google_login():
                 "https://www.googleapis.com/auth/userinfo.profile",
                 "https://www.googleapis.com/auth/calendar.events",
             ],
-            redirect_uri=current_app.config.get("GOOGLE_REDIRECT_URI", "http://localhost:3000"),
+            redirect_uri=FRONTEND_REDIRECT_URI,
         )
 
         flow.fetch_token(code=code)
@@ -117,6 +124,8 @@ def google_login():
         )
 
     except Exception as exc:  # pragma: no cover
+        # Log OAuth errors to help diagnose redirect/consent issues
+        print(f"OAuth Error: {exc}")
         return jsonify({"message": str(exc)}), 500
 
 

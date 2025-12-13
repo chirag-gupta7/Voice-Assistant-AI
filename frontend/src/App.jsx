@@ -21,7 +21,7 @@ function App() {
             <Route path="/register" element={<Register />} />
 
             <Route
-              path="/oauth2callback"
+              path="/auth/callback"
               element={(
                 <ProtectedRoute>
                   <OAuthCallback />
